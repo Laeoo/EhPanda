@@ -1,0 +1,57 @@
+name: Build IPA
+
+on:
+  workflow_dispatch:
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.5.app
+  SCHEME_NAME: EhPanda
+  ARCHIVE_PATH: ${{ github.workspace }}/build/EhPanda.xcarchive
+  IPA_PATH: ${{ github.workspace }}/build/EhPanda.ipa
+
+jobs:
+  build:
+    runs-on: macos-26
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build archive
+        run: |
+          mkdir -p build
+
+          xcodebuild archive \
+            -project EhPanda.xcodeproj \
+            -scheme "$SCHEME_NAME" \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$ARCHIVE_PATH" \
+            -skipMacroValidation \
+            CODE_SIGN_IDENTITY= \
+            CODE_SIGN_ENTITLEMENTS= \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            GCC_OPTIMIZATION_LEVEL=s \
+            SWIFT_OPTIMIZATION_LEVEL=-O
+
+      - name: Create IPA
+        run: |
+          rm -rf build/Payload
+          mkdir -p build/Payload
+
+          cp -R \
+            "$ARCHIVE_PATH/Products/Applications/$SCHEME_NAME.app" \
+            build/Payload/
+
+          cd build
+          zip -r "$(basename "$IPA_PATH")" Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: EhPanda-unsigned-IPA
+          path: ${{ env.IPA_PATH }}
+          retention-days: 7
